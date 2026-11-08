@@ -1,0 +1,261 @@
+diff --git a/package/boot/uboot-envtools/files/mediatek_filogic b/package/boot/uboot-envtools/files/mediatek_filogic
+index add5dbb3d3..232fc2f0d4 100644
+--- a/package/boot/uboot-envtools/files/mediatek_filogic
++++ b/package/boot/uboot-envtools/files/mediatek_filogic
+@@ -88,6 +88,9 @@ jdcloud,re-cp-03)
+ 		;;
+ 	esac
+ 	;;
++clt,r30b1|\
++	ubootenv_add_uci_config "/dev/mtd2" "0x0" "0x80000" "0x20000" "4"
++	;;
+ comfast,cf-e393ax)
+ 	ubootenv_add_uci_config "/dev/mtd1" "0x0" "0x20000" "0x80000"
+ 	;;
+diff --git a/target/linux/mediatek/dts/mt7981b-clt-r30b1.dts b/target/linux/mediatek/dts/mt7981b-clt-r30b1.dts
+new file mode 100644
+index 0000000000..7844bf1fa7
+--- /dev/null
++++ b/target/linux/mediatek/dts/mt7981b-clt-r30b1.dts
+@@ -0,0 +1,123 @@
++/dts-v1/;
++
++#include "mt7981.dtsi"
++
++/ {
++    model = "CLT R30B1";
++    compatible = "clt,r30b1", "mediatek,mt7981";
++
++    aliases {
++        led-boot = &led_status_green;
++        led-failsafe = &led_status_red;
++        led-running = &led_status_green;
++        led-upgrade = &led_status_red;
++    };
++
++    chosen {
++        bootargs-append = "earlycon";
++    };
++
++    memory@40000000 {
++        device_type = "memory";
++        reg = <0x40000000 0x10000000>; /* 256MB */
++    };
++
++    gpio-keys {
++        compatible = "gpio-keys";
++
++        reset {
++            label = "reset";
++            gpios = <&pio 9 GPIO_ACTIVE_LOW>; /* Adjust if wrong */
++            linux,code = <KEY_RESTART>;
++        };
++
++        mesh {
++            label = "mesh";
++            gpios = <&pio 10 GPIO_ACTIVE_LOW>; /* Adjust if wrong */
++            linux,code = <KEY_WPS_BUTTON>;
++        };
++    };
++
++    gpio-leds {
++        compatible = "gpio-leds";
++
++        led_status_green: status_green {
++            label = "green:status";
++            gpios = <&pio 11 GPIO_ACTIVE_LOW>; /* Adjust if wrong */
++            default-state = "off";
++        };
++
++        led_status_red: status_red {
++            label = "red:status";
++            gpios = <&pio 12 GPIO_ACTIVE_LOW>; /* Adjust if wrong */
++            default-state = "off";
++        };
++    };
++};
++
++&spi0 {
++    status = "okay";
++
++    flash@0 {
++        compatible = "jedec,spi-nor";
++        reg = <0>;
++        spi-max-frequency = <80000000>;
++
++        partitions {
++            compatible = "fixed-partitions";
++            #address-cells = <1>;
++            #size-cells = <1>;
++
++            partition@0 {
++                label = "BL2";
++                reg = <0x0 0x100000>;
++                read-only;
++            };
++
++            partition@100000 {
++                label = "u-boot-env";
++                reg = <0x100000 0x80000>;
++            };
++
++            partition@180000 {
++                label = "Factory";
++                reg = <0x180000 0x200000>;
++                read-only;
++            };
++
++            partition@380000 {
++                label = "FIP";
++                reg = <0x380000 0x200000>;
++                read-only;
++            };
++
++            partition@580000 {
++                label = "ubi";
++                reg = <0x580000 0x7000000>;
++            };
++        };
++    };
++};
++
++&eth {
++    status = "okay";
++
++    gmac0: mac@0 {
++        compatible = "mediatek,eth-mac";
++        reg = <0>;
++        phy-mode = "2500base-x";
++        fixed-link {
++            speed = <2500>;
++            full-duplex;
++        };
++    };
++};
++
++&switch0 {
++    status = "okay";
++};
++
++&wmac {
++    status = "okay";
++};
++
+diff --git a/target/linux/mediatek/filogic/base-files/etc/board.d/01_leds b/target/linux/mediatek/filogic/base-files/etc/board.d/01_leds
+index 840072a556..a09294516a 100644
+--- a/target/linux/mediatek/filogic/base-files/etc/board.d/01_leds
++++ b/target/linux/mediatek/filogic/base-files/etc/board.d/01_leds
+@@ -11,6 +11,11 @@ abt,asr3000)
+ 	ucidef_set_led_netdev "wlan2g" "WLAN2G" "green:wlan-2ghz" "phy0-ap0"
+ 	ucidef_set_led_netdev "wlan5g" "WLAN5G" "green:wlan-5ghz" "phy1-ap0"
+ 	;;
++clt,r30b1)
++	ucidef_set_led_default "all_ctrl" "ALL_CTRL" "ctrl_led_all" "1"
++	ucidef_set_led_default "internet" "INTERNET" "led_internet" "1"
++	ucidef_set_led_default "power_red" "POWER_RED" "led_power" "0"
++	;;
+ confiabits,mt7981)
+ 	ucidef_set_led_netdev "lan1" "lan1" "blue:lan-1" "lan1" "link tx rx"
+ 	ucidef_set_led_netdev "lan2" "lan2" "blue:lan-2" "lan2" "link tx rx"
+diff --git a/target/linux/mediatek/filogic/base-files/etc/board.d/02_network b/target/linux/mediatek/filogic/base-files/etc/board.d/02_network
+index 7d9610d62c..aa3322a52e 100644
+--- a/target/linux/mediatek/filogic/base-files/etc/board.d/02_network
++++ b/target/linux/mediatek/filogic/base-files/etc/board.d/02_network
+@@ -124,6 +124,11 @@ mediatek_setup_interfaces()
+ 	tplink,re6000xd)
+ 		ucidef_set_interface_lan "lan1 lan2 eth1"
+ 		;;
++	*clt,r30b1* |\
++		ucidef_set_interfaces_lan_wan "eth0" "eth1"
++		ucidef_add_switch "switch0" \
++			"0:lan" "1:lan" "2:lan" "6u@eth0"
++		;;
+ 	xiaomi,mi-router-ax3000t|\
+ 	xiaomi,mi-router-ax3000t-ubootmod|\
+ 	xiaomi,mi-router-wr30u-stock|\
+@@ -181,6 +186,12 @@ mediatek_setup_macs()
+ 		wan_mac=$label_mac
+ 		lan_mac=$(macaddr_add "$label_mac" 1)
+ 		;;
++	*clt,r30b1*)
++		lan_mac=$(mtd_get_mac_binary $part_name 0x2A)
++		wan_mac=$(mtd_get_mac_binary $part_name 0x24)
++		label_mac=$lan_mac
++		local wifi_mac="$(mtd_get_mac_binary $part_name 0x04)"
++		;;
+ 	xiaomi,mi-router-ax3000t|\
+ 	xiaomi,mi-router-ax3000t-ubootmod|\
+ 	xiaomi,mi-router-wr30u-stock|\
+diff --git a/target/linux/mediatek/filogic/base-files/lib/upgrade/platform.sh b/target/linux/mediatek/filogic/base-files/lib/upgrade/platform.sh
+index 89aeaadedb..b8d32e0da5 100755
+--- a/target/linux/mediatek/filogic/base-files/lib/upgrade/platform.sh
++++ b/target/linux/mediatek/filogic/base-files/lib/upgrade/platform.sh
+@@ -123,6 +123,9 @@ platform_do_upgrade() {
+ 		CI_KERNPART="linux"
+ 		nand_do_upgrade "$1"
+ 		;;
++        clt,r30b1 |\
++                nand_do_upgrade "$1"
++                ;;
+ 	cudy,re3000-v1|\
+ 	cudy,wr3000-v1|\
+ 	yuncore,ax835)
+@@ -191,6 +194,17 @@ platform_check_image() {
+ 			echo "Invalid image type."
+ 			return 1
+ 		}
++		return 0
++		;;
++        clt,r30b1)
++		# tar magic `ustar`
++		magic="$(dd if="$1" bs=1 skip=257 count=5 2>/dev/null)"
++
++		[ "$magic" != "ustar" ] && {
++			echo "Invalid image type."
++			return 1
++		}
++
+ 		return 0
+ 		;;
+ 	*)
+@@ -208,6 +222,7 @@ platform_copy_config() {
+ 	bananapi,bpi-r3-mini|\
+ 	bananapi,bpi-r4|\
+ 	bananapi,bpi-r4-poe|\
++        clt,r30b1 |\
+ 	cmcc,rax3000m)
+ 		if [ "$CI_METHOD" = "emmc" ]; then
+ 			emmc_copy_config
+diff --git a/target/linux/mediatek/image/filogic.mk b/target/linux/mediatek/image/filogic.mk
+index 60f45a73e6..40d1692ac2 100644
+--- a/target/linux/mediatek/image/filogic.mk
++++ b/target/linux/mediatek/image/filogic.mk
+@@ -500,6 +500,28 @@ define Device/cetron_ct3003
+ endef
+ TARGET_DEVICES += cetron_ct3003
+ 
++define Device/clt_r30b1
++  DEVICE_VENDOR := MediaTek
++  DEVICE_MODEL := CLT R30B1
++  DEVICE_DTS := mt7981b-clt-r30b1
++  DEVICE_DTS_DIR := ../dts
++  SUPPORTED_DEVICES := clt,r30b1
++  DEVICE_PACKAGES := kmod-mt7986-firmware mt7981-wo-firmware
++  UBINIZE_OPTS := -E 5
++  BLOCKSIZE := 128k
++  PAGESIZE := 2048
++  IMAGE_SIZE := 114688k
++  KERNEL = kernel-bin | lzma | \
++    fit lzma $(KDIR)/image-$(firstword $(DEVICE_DTS)).dtb
++  KERNEL_INITRAMFS = kernel-bin | lzma | \
++    fit lzma $(KDIR)/image-$(firstword $(DEVICE_DTS)).dtb with-initrd
++  IMAGES := factory.bin sysupgrade.bin
++  IMAGE/factory.bin := append-ubi | check-size $$$$(IMAGE_SIZE)
++  IMAGE/sysupgrade.bin := sysupgrade-tar | append-metadata
++  KERNEL_IN_UBI := 1
++endef
++TARGET_DEVICES += clt_r30b1
++
+ define Device/cmcc_a10-stock
+   DEVICE_VENDOR := CMCC
+   DEVICE_MODEL := A10 (stock layout)
